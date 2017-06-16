@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="bc5bba35-c8ac-4f96-a841-c596952b1f56" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/main/java/com/test/JavaVMStackOMM.java" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/java/com/test/JavaVMStackSOF.java" afterPath="$PROJECT_DIR$/src/main/java/com/test/JavaVMStackSOF.java" />
-    </list>
+    <list default="true" id="bc5bba35-c8ac-4f96-a841-c596952b1f56" name="Default" comment="" />
     <ignored path="$PROJECT_DIR$/out/" />
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path=".idea/dataSources.local.xml" />
@@ -71,8 +67,8 @@
       <file leaf-file-name="JavaVMStackOMM.java" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/main/java/com/test/JavaVMStackOMM.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="437">
-              <caret line="27" column="5" selection-start-line="27" selection-start-column="5" selection-end-line="27" selection-end-column="5" />
+            <state relative-caret-position="266">
+              <caret line="14" column="20" selection-start-line="14" selection-start-column="20" selection-end-line="14" selection-end-column="20" />
               <folding />
             </state>
           </provider>
@@ -848,7 +844,7 @@
       <workItem from="1493948505671" duration="78000" />
       <workItem from="1493964132979" duration="832000" />
       <workItem from="1494312934501" duration="442000" />
-      <workItem from="1497591052517" duration="5000" />
+      <workItem from="1497591052517" duration="31000" />
     </task>
     <task id="LOCAL-00001" summary="添加栈溢出实验">
       <created>1493964615658</created>
@@ -857,11 +853,18 @@
       <option name="project" value="LOCAL" />
       <updated>1493964615658</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="添加栈溢出实验">
+      <created>1497591063909</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1497591063909</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="7307000" />
+    <option name="totallyTimeSpent" value="7333000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-4" y="-4" width="1928" height="1060" extended-state="6" />
@@ -1157,8 +1160,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/main/java/com/test/JavaVMStackOMM.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="437">
-          <caret line="27" column="5" selection-start-line="27" selection-start-column="5" selection-end-line="27" selection-end-column="5" />
+        <state relative-caret-position="266">
+          <caret line="14" column="20" selection-start-line="14" selection-start-column="20" selection-end-line="14" selection-end-column="20" />
           <folding />
         </state>
       </provider>
