@@ -10,6 +10,7 @@ public class JavaMethodAreaOOM {
     public static void main(String[] args){
         while(true){
             System.out.print("sdd");
+            System.out.print("sdd");
         }
     }
 
