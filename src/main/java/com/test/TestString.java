@@ -3,7 +3,7 @@ package com.test;
 /**
  * Created by zhaojw on 2017/4/18.
  */
-public class TestMain {
+public class TestString {
     public static void main(String[] args){
         System.out.println("shit shit shit");
 
