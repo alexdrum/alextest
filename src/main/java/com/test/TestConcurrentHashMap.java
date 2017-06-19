@@ -1,16 +1,11 @@
 package com.test;
 
-import com.google.common.collect.Maps;
-import jdk.nashorn.internal.objects.annotations.Getter;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Created by ALEXDRUM on 2017/6/19.
  */
-@Slf4j
 public class TestConcurrentHashMap {
     public static void main(String[] args){
         ConcurrentHashMap<Integer, Integer> concurrentHashMap = new ConcurrentHashMap(32);
@@ -23,5 +18,8 @@ public class TestConcurrentHashMap {
             TestUtils.log(entry.getKey());
             TestUtils.log(entry.getValue());
         }
+
+        SubConcurrentHashMap<Integer, Integer> subConcurrentHashMap = new SubConcurrentHashMap<Integer, Integer>();
+        subConcurrentHashMap.put(21312, 3333);
     }
 }

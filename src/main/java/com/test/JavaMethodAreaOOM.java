@@ -13,5 +13,4 @@ public class JavaMethodAreaOOM {
             System.out.print("sdd");
         }
     }
-
 }
