@@ -8,6 +8,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class TestConcurrentHashMap {
     public static void main(String[] args){
+        test2();
+    }
+
+    private static void test1(){
         ConcurrentHashMap<Integer, Integer> concurrentHashMap = new ConcurrentHashMap(32);
         int putCount = 3600;
         for(int i = 0; i < putCount; i++){
@@ -18,8 +22,16 @@ public class TestConcurrentHashMap {
             TestUtils.log(entry.getKey());
             TestUtils.log(entry.getValue());
         }
+    }
 
-        SubConcurrentHashMap<Integer, Integer> subConcurrentHashMap = new SubConcurrentHashMap<Integer, Integer>();
-        subConcurrentHashMap.put(21312, 3333);
+    private static void test2(){
+        SubConcurrentHashMap<Integer, Integer> subConcurrentHashMap = new SubConcurrentHashMap<Integer, Integer>(10);
+        int putCount = 10;
+        for(int i = 0; i < putCount; i++){
+            subConcurrentHashMap.put(i,i);
+        }
+
+        // 打印结果
+        TestUtils.printMap(subConcurrentHashMap);
     }
 }
