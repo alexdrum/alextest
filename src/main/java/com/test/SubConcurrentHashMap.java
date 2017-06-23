@@ -32,13 +32,24 @@ public class SubConcurrentHashMap<K,V> extends ConcurrentHashMap {
     private static final int tableSizeFor(int c) {
         // 计算最相近的2次方数
         int n = c - 1;
-        n |= n >>> 1;
-        n |= n >>> 2;
-        n |= n >>> 4;
-        n |= n >>> 8;
-        n |= n >>> 16;
+        int temp = n >>> 1;
+        n = n | temp;
+        temp = n >>> 2;
+        n = n | temp;
+        temp = n >>> 4;
+        n = n | temp;
+        temp = n >>> 8;
+        n = n | temp;
+        temp = n >>> 16;
+        n = n | temp;
         // 判断最后计算出的数是不是比table最大容量大，如果是就返回最大容量
-        return (n < 0) ? 1 : (n >= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACITY : n + 1;
+        if(n<0){
+            return 1;
+        }
+        if(n >= MAXIMUM_CAPACITY){
+            return MAXIMUM_CAPACITY;
+        }
+        return n + 1;
     }
 
     /**
@@ -57,8 +68,11 @@ public class SubConcurrentHashMap<K,V> extends ConcurrentHashMap {
         if(initialCapacity >= halfMaximumCapacity){
             cap = MAXIMUM_CAPACITY;
         }else{
-            int toBePoweredInitialCapacity =  initialCapacity + (initialCapacity >>> 1) + 1;
-            int poweredInitialCapacity = toBePoweredInitialCapacity;
+            int halfInitialCapacity = (initialCapacity >>> 1);
+            // 在计算相近2的n次幂值之前，先加传入值的一半再加1
+            // 如传入值为10，则toBePoweredInitialCapacity为：10+5+1=16
+            int toBePoweredInitialCapacity =  initialCapacity + halfInitialCapacity + 1;
+            int poweredInitialCapacity = tableSizeFor(toBePoweredInitialCapacity);
             cap = poweredInitialCapacity;
         }
         sizeCtl = cap;

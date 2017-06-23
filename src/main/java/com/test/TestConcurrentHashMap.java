@@ -25,8 +25,8 @@ public class TestConcurrentHashMap {
     }
 
     private static void test2(){
-        SubConcurrentHashMap<Integer, Integer> subConcurrentHashMap = new SubConcurrentHashMap<Integer, Integer>(10);
-        int putCount = 10;
+        int putCount = 11;
+        SubConcurrentHashMap<Integer, Integer> subConcurrentHashMap = new SubConcurrentHashMap<Integer, Integer>(putCount);
         for(int i = 0; i < putCount; i++){
             subConcurrentHashMap.put(i,i);
         }
