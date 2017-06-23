@@ -12,16 +12,12 @@ public class TestConcurrentHashMap {
     }
 
     private static void test1(){
-        ConcurrentHashMap<Integer, Integer> concurrentHashMap = new ConcurrentHashMap(32);
+        ConcurrentHashMap<Object, Object> concurrentHashMap = new ConcurrentHashMap<Object, Object>(32);
         int putCount = 3600;
         for(int i = 0; i < putCount; i++){
             concurrentHashMap.put(i,i);
         }
-        for(Map.Entry<Integer, Integer> entry : concurrentHashMap.entrySet()){
-            TestUtils.log("当前键值对：");
-            TestUtils.log(entry.getKey());
-            TestUtils.log(entry.getValue());
-        }
+        TestUtils.printMap(concurrentHashMap);
     }
 
     private static void test2(){
