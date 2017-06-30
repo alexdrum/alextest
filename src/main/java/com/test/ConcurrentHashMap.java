@@ -135,10 +135,10 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     /*
      * Encodings for Node hash fields. See above for explanation.
      */
-    static final int MOVED = -1; // hash for forwarding nodes
-    static final int TREEBIN = -2; // hash for roots of trees
+    static final int MOVED = -1; // 下个节点的hash值
+    static final int TREEBIN = -2; // 树结构根节点的hash值
     static final int RESERVED = -3; // hash for transient reservations
-    static final int HASH_BITS = 0x7fffffff; // usable bits of normal node hash
+    static final int HASH_BITS = 0x7fffffff; // 正常节点hash值的可用位数（是一个最高位是0，其他位为1的数，即31位）
 
     /**
      * 当前可用的CPU数
@@ -247,12 +247,12 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                 do {
                     K currentNodeKey;
                     // 先对比key的hash值
-                    if (currentNode.hash == toBeFoundNodeHash){
+                    if (currentNode.hash == toBeFoundNodeHash) {
                         // 获得当前node的key
                         currentNodeKey = currentNode.key;
                         // 对比key的值
-                        if(currentNodeKey == toBeFoundNodeKey
-                                || (currentNodeKey != null && toBeFoundNodeKey.equals(currentNodeKey))){
+                        if (currentNodeKey == toBeFoundNodeKey
+                                || (currentNodeKey != null && toBeFoundNodeKey.equals(currentNodeKey))) {
                             // 如key相等且hash值也相等，则返回当前node
                             return currentNode;
                         }
@@ -265,60 +265,65 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
 
     /* ---------------- 静态方法 -------------- */
 
-    /**
-     * Spreads (XORs) higher bits of hash to lower and also forces top
-     * bit to 0. Because the table uses power-of-two masking, sets of
-     * hashes that vary only in bits above the current mask will
-     * always collide. (Among known examples are sets of Float keys
-     * holding consecutive whole numbers in small tables.)  So we
-     * apply a transform that spreads the impact of higher bits
-     * downward. There is a tradeoff between speed, utility, and
-     * quality of bit-spreading. Because many common sets of hashes
-     * are already reasonably distributed (so don't benefit from
-     * spreading), and because we use trees to handle large sets of
-     * collisions in bins, we just XOR some shifted bits in the
-     * cheapest possible way to reduce systematic lossage, as well as
-     * to incorporate impact of the highest bits that would otherwise
-     * never be used in index calculations because of table bounds.
-     */
+    //调整hash值分布的方法，类似于HashMap中的hash(Object key)方法
     static final int spread(int h) {
-        return (h ^ (h >>> 16)) & HASH_BITS;
+        // java的int类型为32位
+        // 先将传入的h无符号右移16位
+        int unsignedRightShiftedH = h >>> 16;
+        // 高16位不变，低16位与高16位进行了异或运算
+        int xorWithUnsignedRightShiftedH = h ^ unsignedRightShiftedH;
+        // 最后再取低31位，最高一位舍弃
+        int returnValue = xorWithUnsignedRightShiftedH & HASH_BITS;
+        return returnValue;
     }
 
     /**
-     * Returns a power of two table size for the given desired capacity.
-     * See Hackers Delight, sec 3.2
+     * 给出离传入参数最近的一个2的次方数
+     * 例如传入3返回4，传入6返回8，传入9返回16
+     * 用于初始化table的大小（table的大小必须是一个2的次方数）
      */
     private static final int tableSizeFor(int c) {
+
         int n = c - 1;
-        n |= n >>> 1;
-        n |= n >>> 2;
-        n |= n >>> 4;
-        n |= n >>> 8;
-        n |= n >>> 16;
-        return (n < 0) ? 1 : (n >= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACITY : n + 1;
+
+        n = n | n >>> 1;
+        n = n | n >>> 2;
+        n = n | n >>> 4;
+        n = n | n >>> 8;
+        n = n | n >>> 16;
+
+        if (n < 0) {
+            return 1;
+        }
+
+        if (n >= MAXIMUM_CAPACITY) {
+            return MAXIMUM_CAPACITY;
+        } else {
+            return n + 1;
+        }
     }
 
     /**
-     * Returns x's Class if it is of the form "class C implements
-     * Comparable<C>", else null.
+     * 用来判断传入对象是否是实现了Comparable接口的类
+     * 如果是则返回次对象，不是则返回null
      */
     static Class<?> comparableClassFor(Object x) {
+        // 如果对象实现了Comparable接口
         if (x instanceof Comparable) {
-            Class<?> c;
+            Class<?> comparableClass;
             Type[] ts, as;
             Type t;
             ParameterizedType p;
-            if ((c = x.getClass()) == String.class) // bypass checks
-                return c;
-            if ((ts = c.getGenericInterfaces()) != null) {
+            if ((comparableClass = x.getClass()) == String.class) // bypass checks
+                return comparableClass;
+            if ((ts = comparableClass.getGenericInterfaces()) != null) {
                 for (int i = 0; i < ts.length; ++i) {
                     if (((t = ts[i]) instanceof ParameterizedType) &&
                             ((p = (ParameterizedType) t).getRawType() ==
                                     Comparable.class) &&
                             (as = p.getActualTypeArguments()) != null &&
-                            as.length == 1 && as[0] == c) // type arg is c
-                        return c;
+                            as.length == 1 && as[0] == comparableClass) // type arg is c
+                        return comparableClass;
                 }
             }
         }
