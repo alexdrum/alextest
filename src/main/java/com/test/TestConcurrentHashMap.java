@@ -1,18 +1,15 @@
 package com.test;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 /**
  * Created by ALEXDRUM on 2017/6/19.
  */
 public class TestConcurrentHashMap {
     public static void main(String[] args){
-        test2();
+        test1();
     }
 
     private static void test1(){
-        ConcurrentHashMap<Object, Object> concurrentHashMap = new ConcurrentHashMap<Object, Object>(32);
+        ConcurrentHashMap<Object, Object> concurrentHashMap = new ConcurrentHashMap<>(32);
         int putCount = 3600;
         for(int i = 0; i < putCount; i++){
             concurrentHashMap.put(i,i);
