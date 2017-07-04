@@ -35,8 +35,11 @@
 
 package com.test;
 
+import sun.misc.Unsafe;
+
 import java.io.ObjectStreamField;
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -310,20 +313,42 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     static Class<?> comparableClassFor(Object x) {
         // 如果对象实现了Comparable接口
         if (x instanceof Comparable) {
-            Class<?> comparableClass;
-            Type[] ts, as;
-            Type t;
-            ParameterizedType p;
-            if ((comparableClass = x.getClass()) == String.class) // bypass checks
+
+            // 获得对象x的相关信息
+            Class<?> comparableClass = x.getClass();                // x所属的类信息
+            Type[] actualizedInterfaces = comparableClass.getGenericInterfaces();  // 获得x所属类直接实现的接口
+            Type[] typeArguments;
+            Type currentInterface;
+            ParameterizedType parameterizedType;
+
+            // 短路检查，如果是String类型直接返回
+            if (comparableClass == String.class)
                 return comparableClass;
-            if ((ts = comparableClass.getGenericInterfaces()) != null) {
-                for (int i = 0; i < ts.length; ++i) {
-                    if (((t = ts[i]) instanceof ParameterizedType) &&
-                            ((p = (ParameterizedType) t).getRawType() ==
-                                    Comparable.class) &&
-                            (as = p.getActualTypeArguments()) != null &&
-                            as.length == 1 && as[0] == comparableClass) // type arg is c
+
+            // 如果继承了接口，则逐个检查
+            if (actualizedInterfaces != null) {
+                for (int i = 0; i < actualizedInterfaces.length; ++i) {
+                    // 获得当前判断的接口
+                    currentInterface = actualizedInterfaces[i];
+                    // 获得接口的n（若干个）泛型参数类型
+                    try {
+                        parameterizedType = (ParameterizedType) currentInterface;
+                    }catch (ClassCastException e){
+                        e.printStackTrace();
+                        return null;
+                    }
+                    // 将n个泛型参数类型放入typeArguments数组中用于判断
+                    typeArguments = parameterizedType.getActualTypeArguments();
+                    // 如果：
+                    // 当前实现接口含有泛型参数
+                    // 当前接口是Comparable接口或者实现了Comparable接口
+                    // 当前接口泛型参数不为null、长度为1、泛型参数就是当前方法传入对象的类
+                    if ((currentInterface instanceof ParameterizedType) &&
+                            (parameterizedType.getRawType() == Comparable.class) &&
+                            (typeArguments != null && typeArguments.length == 1 && typeArguments[0] == comparableClass)){
+                        // 满足以上条件返回传入对象x的所属类
                         return comparableClass;
+                    }
                 }
             }
         }
@@ -360,16 +385,16 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
 
     @SuppressWarnings("unchecked")
     static final <K, V> Node<K, V> tabAt(Node<K, V>[] tab, int i) {
-        return (Node<K, V>) U.getObjectVolatile(tab, ((long) i << ASHIFT) + ABASE);
+        return (Node<K, V>) UNSAFE.getObjectVolatile(tab, ((long) i << ARRAY_SHIFT) + ARRAY_BASE);
     }
 
     static final <K, V> boolean casTabAt(Node<K, V>[] tab, int i,
                                          Node<K, V> c, Node<K, V> v) {
-        return U.compareAndSwapObject(tab, ((long) i << ASHIFT) + ABASE, c, v);
+        return UNSAFE.compareAndSwapObject(tab, ((long) i << ARRAY_SHIFT) + ARRAY_BASE, c, v);
     }
 
     static final <K, V> void setTabAt(Node<K, V>[] tab, int i, Node<K, V> v) {
-        U.putObjectVolatile(tab, ((long) i << ASHIFT) + ABASE, v);
+        UNSAFE.putObjectVolatile(tab, ((long) i << ARRAY_SHIFT) + ARRAY_BASE, v);
     }
 
     /* ---------------- Fields -------------- */
@@ -418,8 +443,8 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     private transient volatile CounterCell[] counterCells;
 
     // views
-    private transient KeySetView<K, V> keySet;
-    private transient ValuesView<K, V> values;
+    private transient KeySetView<K, V> concurrentHashMapKeySet;
+    private transient ValuesView<K, V> concurrentHashMapValues;
     private transient EntrySetView<K, V> entrySet;
 
 
@@ -837,7 +862,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
      */
     public KeySetView<K, V> keySet() {
         KeySetView<K, V> ks;
-        return (ks = keySet) != null ? ks : (keySet = new KeySetView<K, V>(this, null));
+        return (ks = concurrentHashMapKeySet) != null ? ks : (concurrentHashMapKeySet = new KeySetView<K, V>(this, null));
     }
 
     /**
@@ -860,7 +885,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
      */
     public Collection<V> values() {
         ValuesView<K, V> vs;
-        return (vs = values) != null ? vs : (values = new ValuesView<K, V>(this));
+        return (vs = concurrentHashMapValues) != null ? vs : (concurrentHashMapValues = new ValuesView<K, V>(this));
     }
 
     /**
@@ -1837,7 +1862,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         while ((tab = table) == null || tab.length == 0) {
             if ((sc = sizeCtl) < 0)
                 Thread.yield(); // lost initialization race; just spin
-            else if (U.compareAndSwapInt(this, SIZECTL, sc, -1)) {
+            else if (UNSAFE.compareAndSwapInt(this, SIZE_CTL, sc, -1)) {
                 try {
                     if ((tab = table) == null || tab.length == 0) {
                         int n = (sc > 0) ? sc : DEFAULT_CAPACITY;
@@ -1869,7 +1894,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         CounterCell[] as;
         long b, s;
         if ((as = counterCells) != null ||
-                !U.compareAndSwapLong(this, BASECOUNT, b = baseCount, s = b + x)) {
+                !UNSAFE.compareAndSwapLong(this, BASE_COUNT, b = baseCount, s = b + x)) {
             CounterCell a;
             long v;
             int m;
@@ -1877,7 +1902,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
             if (as == null || (m = as.length - 1) < 0 ||
                     (a = as[ThreadLocalRandom.getProbe() & m]) == null ||
                     !(uncontended =
-                            U.compareAndSwapLong(a, CELLVALUE, v = a.value, v + x))) {
+                            UNSAFE.compareAndSwapLong(a, CELL_VALUE, v = a.value, v + x))) {
                 fullAddCount(x, uncontended);
                 return;
             }
@@ -1896,9 +1921,9 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                             sc == rs + MAX_RESIZERS || (nt = nextTable) == null ||
                             transferIndex <= 0)
                         break;
-                    if (U.compareAndSwapInt(this, SIZECTL, sc, sc + 1))
+                    if (UNSAFE.compareAndSwapInt(this, SIZE_CTL, sc, sc + 1))
                         transfer(tab, nt);
-                } else if (U.compareAndSwapInt(this, SIZECTL, sc,
+                } else if (UNSAFE.compareAndSwapInt(this, SIZE_CTL, sc,
                         (rs << RESIZE_STAMP_SHIFT) + 2))
                     transfer(tab, null);
                 s = sumCount();
@@ -1920,7 +1945,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                 if ((sc >>> RESIZE_STAMP_SHIFT) != rs || sc == rs + 1 ||
                         sc == rs + MAX_RESIZERS || transferIndex <= 0)
                     break;
-                if (U.compareAndSwapInt(this, SIZECTL, sc, sc + 1)) {
+                if (UNSAFE.compareAndSwapInt(this, SIZE_CTL, sc, sc + 1)) {
                     transfer(tab, nextTab);
                     break;
                 }
@@ -1944,7 +1969,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
             int n;
             if (tab == null || (n = tab.length) == 0) {
                 n = (sc > c) ? sc : c;
-                if (U.compareAndSwapInt(this, SIZECTL, sc, -1)) {
+                if (UNSAFE.compareAndSwapInt(this, SIZE_CTL, sc, -1)) {
                     try {
                         if (table == tab) {
                             @SuppressWarnings("unchecked")
@@ -1966,9 +1991,9 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                             sc == rs + MAX_RESIZERS || (nt = nextTable) == null ||
                             transferIndex <= 0)
                         break;
-                    if (U.compareAndSwapInt(this, SIZECTL, sc, sc + 1))
+                    if (UNSAFE.compareAndSwapInt(this, SIZE_CTL, sc, sc + 1))
                         transfer(tab, nt);
-                } else if (U.compareAndSwapInt(this, SIZECTL, sc,
+                } else if (UNSAFE.compareAndSwapInt(this, SIZE_CTL, sc,
                         (rs << RESIZE_STAMP_SHIFT) + 2))
                     transfer(tab, null);
             }
@@ -2009,8 +2034,8 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                 else if ((nextIndex = transferIndex) <= 0) {
                     i = -1;
                     advance = false;
-                } else if (U.compareAndSwapInt
-                        (this, TRANSFERINDEX, nextIndex,
+                } else if (UNSAFE.compareAndSwapInt
+                        (this, TRANSFER_INDEX, nextIndex,
                                 nextBound = (nextIndex > stride ?
                                         nextIndex - stride : 0))) {
                     bound = nextBound;
@@ -2026,7 +2051,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                     sizeCtl = (n << 1) - (n >>> 1);
                     return;
                 }
-                if (U.compareAndSwapInt(this, SIZECTL, sc = sizeCtl, sc - 1)) {
+                if (UNSAFE.compareAndSwapInt(this, SIZE_CTL, sc = sizeCtl, sc - 1)) {
                     if ((sc - 2) != resizeStamp(n) << RESIZE_STAMP_SHIFT)
                         return;
                     finishing = advance = true;
@@ -2157,7 +2182,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                     if (cellsBusy == 0) {            // Try to attach new Cell
                         CounterCell r = new CounterCell(x); // Optimistic create
                         if (cellsBusy == 0 &&
-                                U.compareAndSwapInt(this, CELLSBUSY, 0, 1)) {
+                                UNSAFE.compareAndSwapInt(this, CELLS_BUSY, 0, 1)) {
                             boolean created = false;
                             try {               // Recheck under lock
                                 CounterCell[] rs;
@@ -2179,14 +2204,14 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                     collide = false;
                 } else if (!wasUncontended)       // CAS already known to fail
                     wasUncontended = true;      // Continue after rehash
-                else if (U.compareAndSwapLong(a, CELLVALUE, v = a.value, v + x))
+                else if (UNSAFE.compareAndSwapLong(a, CELL_VALUE, v = a.value, v + x))
                     break;
                 else if (counterCells != as || n >= NCPU)
                     collide = false;            // At max size or stale
                 else if (!collide)
                     collide = true;
                 else if (cellsBusy == 0 &&
-                        U.compareAndSwapInt(this, CELLSBUSY, 0, 1)) {
+                        UNSAFE.compareAndSwapInt(this, CELLS_BUSY, 0, 1)) {
                     try {
                         if (counterCells == as) {// Expand table unless stale
                             CounterCell[] rs = new CounterCell[n << 1];
@@ -2202,7 +2227,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                 }
                 h = ThreadLocalRandom.advanceProbe(h);
             } else if (cellsBusy == 0 && counterCells == as &&
-                    U.compareAndSwapInt(this, CELLSBUSY, 0, 1)) {
+                    UNSAFE.compareAndSwapInt(this, CELLS_BUSY, 0, 1)) {
                 boolean init = false;
                 try {                           // Initialize table
                     if (counterCells == as) {
@@ -2216,7 +2241,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                 }
                 if (init)
                     break;
-            } else if (U.compareAndSwapLong(this, BASECOUNT, v = baseCount, v + x))
+            } else if (UNSAFE.compareAndSwapLong(this, BASE_COUNT, v = baseCount, v + x))
                 break;                          // Fall back on using base
         }
     }
@@ -2343,9 +2368,9 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         volatile Thread waiter;
         volatile int lockState;
         // values for lockState
-        static final int WRITER = 1; // set while holding write lock
-        static final int WAITER = 2; // set when waiting for write lock
-        static final int READER = 4; // increment value for setting read lock
+        static final int C_WRITER = 1; // set while holding write lock
+        static final int C_WAITER = 2; // set when waiting for write lock
+        static final int C_READER = 4; // increment value for setting read lock
 
         /**
          * Tie-breaking utility for ordering insertions when equal
@@ -2414,7 +2439,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
          * Acquires write lock for tree restructuring.
          */
         private final void lockRoot() {
-            if (!U.compareAndSwapInt(this, LOCKSTATE, 0, WRITER))
+            if (!U.compareAndSwapInt(this, C_LOCK_STATE, 0, C_WRITER))
                 contendedLock(); // offload to separate method
         }
 
@@ -2431,14 +2456,14 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         private final void contendedLock() {
             boolean waiting = false;
             for (int s; ; ) {
-                if (((s = lockState) & ~WAITER) == 0) {
-                    if (U.compareAndSwapInt(this, LOCKSTATE, s, WRITER)) {
+                if (((s = lockState) & ~C_WAITER) == 0) {
+                    if (U.compareAndSwapInt(this, C_LOCK_STATE, s, C_WRITER)) {
                         if (waiting)
                             waiter = null;
                         return;
                     }
-                } else if ((s & WAITER) == 0) {
-                    if (U.compareAndSwapInt(this, LOCKSTATE, s, s | WAITER)) {
+                } else if ((s & C_WAITER) == 0) {
+                    if (U.compareAndSwapInt(this, C_LOCK_STATE, s, s | C_WAITER)) {
                         waiting = true;
                         waiter = Thread.currentThread();
                     }
@@ -2457,21 +2482,21 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                 for (Node<K, V> e = first; e != null; ) {
                     int s;
                     K ek;
-                    if (((s = lockState) & (WAITER | WRITER)) != 0) {
+                    if (((s = lockState) & (C_WAITER | C_WRITER)) != 0) {
                         if (e.hash == h &&
                                 ((ek = e.key) == k || (ek != null && k.equals(ek))))
                             return e;
                         e = e.next;
-                    } else if (U.compareAndSwapInt(this, LOCKSTATE, s,
-                            s + READER)) {
+                    } else if (U.compareAndSwapInt(this, C_LOCK_STATE, s,
+                            s + C_READER)) {
                         TreeNode<K, V> r, p;
                         try {
                             p = ((r = root) == null ? null :
                                     r.findTreeNode(h, k, null));
                         } finally {
                             Thread w;
-                            if (U.getAndAddInt(this, LOCKSTATE, -READER) ==
-                                    (READER | WAITER) && (w = waiter) != null)
+                            if (U.getAndAddInt(this, C_LOCK_STATE, -C_READER) ==
+                                    (C_READER | C_WAITER) && (w = waiter) != null)
                                 LockSupport.unpark(w);
                         }
                         return p;
@@ -2852,13 +2877,13 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         }
 
         private static final sun.misc.Unsafe U;
-        private static final long LOCKSTATE;
+        private static final long C_LOCK_STATE;
 
         static {
             try {
                 U = sun.misc.Unsafe.getUnsafe();
                 Class<?> k = TreeBin.class;
-                LOCKSTATE = U.objectFieldOffset
+                C_LOCK_STATE = U.objectFieldOffset
                         (k.getDeclaredField("lockState"));
             } catch (Exception e) {
                 throw new Error(e);
@@ -6125,37 +6150,50 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         }
     }
 
-    // Unsafe mechanics
-    private static final sun.misc.Unsafe U;
-    private static final long SIZECTL;
-    private static final long TRANSFERINDEX;
-    private static final long BASECOUNT;
-    private static final long CELLSBUSY;
-    private static final long CELLVALUE;
-    private static final long ABASE;
-    private static final int ASHIFT;
+    // Unsafe 机制，为整个类提供CAS方法
+    private static final Unsafe UNSAFE;
+    private static final long SIZE_CTL;
+    private static final long TRANSFER_INDEX;
+    private static final long BASE_COUNT;
+    private static final long CELLS_BUSY;
+    private static final long CELL_VALUE;
+    private static final long ARRAY_BASE;
+    private static final int ARRAY_SHIFT;
 
     static {
         try {
-            U = sun.misc.Unsafe.getUnsafe();
+            // 这个地方重写了获取Unsafe实例的方式
+            // 因为ConcurrentHashMap源码中获得Unsafe实例的方法getUnsafe会判断调用的类是否在jdk包中
+            Field theUnsafeField = Unsafe.class.getDeclaredField("theUnsafe");
+            theUnsafeField.setAccessible(true);
+            UNSAFE = (Unsafe) theUnsafeField.get(null);
+
+            // 找到本类各重要属性的偏移量，以便于使用CAS方法更新值
             Class<?> k = ConcurrentHashMap.class;
-            SIZECTL = U.objectFieldOffset
+
+            SIZE_CTL = UNSAFE.objectFieldOffset
                     (k.getDeclaredField("sizeCtl"));
-            TRANSFERINDEX = U.objectFieldOffset
+
+            TRANSFER_INDEX = UNSAFE.objectFieldOffset
                     (k.getDeclaredField("transferIndex"));
-            BASECOUNT = U.objectFieldOffset
+
+            BASE_COUNT = UNSAFE.objectFieldOffset
                     (k.getDeclaredField("baseCount"));
-            CELLSBUSY = U.objectFieldOffset
+
+            CELLS_BUSY = UNSAFE.objectFieldOffset
                     (k.getDeclaredField("cellsBusy"));
+
             Class<?> ck = CounterCell.class;
-            CELLVALUE = U.objectFieldOffset
+            CELL_VALUE = UNSAFE.objectFieldOffset
                     (ck.getDeclaredField("value"));
+
             Class<?> ak = Node[].class;
-            ABASE = U.arrayBaseOffset(ak);
-            int scale = U.arrayIndexScale(ak);
+            ARRAY_BASE = UNSAFE.arrayBaseOffset(ak);
+            int scale = UNSAFE.arrayIndexScale(ak);
             if ((scale & (scale - 1)) != 0)
                 throw new Error("data type scale not a power of two");
-            ASHIFT = 31 - Integer.numberOfLeadingZeros(scale);
+
+            ARRAY_SHIFT = 31 - Integer.numberOfLeadingZeros(scale);
         } catch (Exception e) {
             throw new Error(e);
         }
