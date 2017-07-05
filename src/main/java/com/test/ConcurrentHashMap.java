@@ -356,48 +356,75 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Returns k.compareTo(x) if x matches kc (k's screened comparable
-     * class), else 0.
+     * 如果参数x属于kc类，则返回k与x的比对结果（传入的k一定保证实现了comparable接口）
+     * 其他情况返回0
+     * 由于方法中使用了强制转换为Comparable类型，特此过滤警告：
+     * @SuppressWarnings({"rawtypes", "unchecked"})
+     * 被强制转型对象将由调用方保证实现了Comparable接口
      */
-    @SuppressWarnings({"rawtypes", "unchecked"}) // for cast to Comparable
+    @SuppressWarnings({"rawtypes", "unchecked"})
     static int compareComparables(Class<?> kc, Object k, Object x) {
-        return (x == null || x.getClass() != kc ? 0 :
-                ((Comparable) k).compareTo(x));
+        // 如果x为null则返回0
+        if (x == null) {
+            return 0;
+        }
+
+        // 检查x的类型
+        if (x.getClass() != kc) {
+            return 0;
+        }
+
+        // 比对k和x并返回比对结果
+        int compareResult = ((Comparable) k).compareTo(x);
+        return compareResult;
     }
 
     /* ---------------- Table element access -------------- */
 
     /*
-     * Volatile access methods are used for table elements as well as
-     * elements of in-progress next table while resizing.  All uses of
-     * the tab arguments must be null checked by callers.  All callers
-     * also paranoically precheck that tab's length is not zero (or an
-     * equivalent check), thus ensuring that any index argument taking
-     * the form of a hash value anded with (length - 1) is a valid
-     * index.  Note that, to be correct wrt arbitrary concurrency
-     * errors by users, these checks must operate on local variables,
-     * which accounts for some odd-looking inline assignments below.
-     * Note that calls to setTabAt always occur within locked regions,
-     * and so in principle require only release ordering, not
-     * full volatile semantics, but are currently coded as volatile
-     * writes to be conservative.
+     * 非稳定访问方法，用于table在调整大小过程中table元素的操作
+     * 所有方法的tab参数都需要由调用者检查是否为null，且判断长度不应为0（或等效的检查）
+     * 因此还要确保所有index参数即哈希值长度减一（length - 1）是一个可用的索引
+     * 请注意，想要纠正任何由用户（JDK使用者）造成的武断并发错误，这些检查必须操作本地变量进行
+     * 同时请注意，setTabAt方法的调用永远伴随着上锁区，所以原理上需要排队等待解锁
+     * 这不仅仅是语义上的不稳定(volatile)操作，而是以保守角度确保线程安全
      */
 
+    // 获取nodeTable中位于位置index的node
     @SuppressWarnings("unchecked")
-    static final <K, V> Node<K, V> tabAt(Node<K, V>[] tab, int i) {
-        return (Node<K, V>) UNSAFE.getObjectVolatile(tab, ((long) i << ARRAY_SHIFT) + ARRAY_BASE);
+    static final <K, V> Node<K, V> tabAt(Node<K, V>[] nodeTable, int index) {
+        // 计算要找到Node的索引
+        long toBeGotNodeIndex = getVolatileIndex(index);
+        // 从nodeTable中获取位于toBeGotNodeIndex的node
+        Node<K, V> returnNode = (Node<K, V>) UNSAFE.getObjectVolatile(nodeTable, toBeGotNodeIndex);
+        return returnNode;
     }
 
-    static final <K, V> boolean casTabAt(Node<K, V>[] tab, int i,
-                                         Node<K, V> c, Node<K, V> v) {
-        return UNSAFE.compareAndSwapObject(tab, ((long) i << ARRAY_SHIFT) + ARRAY_BASE, c, v);
+    // 使用CAS操作将nodeTable中位于位置index的node值由originalNode更新为newNode
+    static final <K, V> boolean casTabAt(Node<K, V>[] nodeTable, int index, Node<K, V> originalNode, Node<K, V> newNode) {
+        // 计算要替换Node的索引
+        long toBeSwappedNodeIndex = getVolatileIndex(index);
+        // 更新值
+        boolean swapResult = UNSAFE.compareAndSwapObject(nodeTable, toBeSwappedNodeIndex, originalNode, newNode);
+        return swapResult;
     }
 
-    static final <K, V> void setTabAt(Node<K, V>[] tab, int i, Node<K, V> v) {
-        UNSAFE.putObjectVolatile(tab, ((long) i << ARRAY_SHIFT) + ARRAY_BASE, v);
+    // 使用volatile原子性操作将nodeTable中位于位置index的node值更新为newNode
+    static final <K, V> void setTabAt(Node<K, V>[] nodeTable, int index, Node<K, V> newNode) {
+        // 计算要更新Node的索引
+        long toBePuttedNodeIndex = getVolatileIndex(index);
+        // 更新值
+        UNSAFE.putObjectVolatile(nodeTable, toBePuttedNodeIndex, newNode);
     }
 
-    /* ---------------- Fields -------------- */
+    // 为不稳定访问方法提供索引转换
+    static final long getVolatileIndex(int index) {
+        long volatileIndex = (long) index << ARRAY_SHIFT;
+        volatileIndex = volatileIndex + ARRAY_BASE;
+        return volatileIndex;
+    }
+
+    /* ---------------- 类属性 -------------- */
 
     /**
      * The array of bins. Lazily initialized upon first insertion.
