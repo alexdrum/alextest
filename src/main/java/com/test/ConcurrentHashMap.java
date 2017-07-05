@@ -171,7 +171,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         final int hash;             // 哈希值
         final K key;                 // key
         volatile V val;             // value
-        volatile Node<K, V> next;    // 当前node的下一个node
+        volatile Node<K, V> next;    // 当头node的下一个node
 
         // 构造方法
         Node(int hash, K key, V val, Node<K, V> next) {
@@ -243,7 +243,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
          * 为map.get()提供虚拟化支持；子类中会被重写.
          */
         Node<K, V> find(int toBeFoundNodeHash, Object toBeFoundNodeKey) {
-            // 当前node
+            // 当头node
             Node<K, V> currentNode = this;
             // 如果待查找的key不为null
             if (toBeFoundNodeKey != null) {
@@ -251,12 +251,12 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                     K currentNodeKey;
                     // 先对比key的hash值
                     if (currentNode.hash == toBeFoundNodeHash) {
-                        // 获得当前node的key
+                        // 获得当头node的key
                         currentNodeKey = currentNode.key;
                         // 对比key的值
                         if (currentNodeKey == toBeFoundNodeKey
                                 || (currentNodeKey != null && toBeFoundNodeKey.equals(currentNodeKey))) {
-                            // 如key相等且hash值也相等，则返回当前node
+                            // 如key相等且hash值也相等，则返回当头node
                             return currentNode;
                         }
                     }
@@ -333,7 +333,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                     // 获得接口的n（若干个）泛型参数类型
                     try {
                         parameterizedType = (ParameterizedType) currentInterface;
-                    }catch (ClassCastException e){
+                    } catch (ClassCastException e) {
                         e.printStackTrace();
                         return null;
                     }
@@ -345,7 +345,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                     // 当前接口泛型参数不为null、长度为1、泛型参数就是当前方法传入对象的类
                     if ((currentInterface instanceof ParameterizedType) &&
                             (parameterizedType.getRawType() == Comparable.class) &&
-                            (typeArguments != null && typeArguments.length == 1 && typeArguments[0] == comparableClass)){
+                            (typeArguments != null && typeArguments.length == 1 && typeArguments[0] == comparableClass)) {
                         // 满足以上条件返回传入对象x的所属类
                         return comparableClass;
                     }
@@ -359,6 +359,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
      * 如果参数x属于kc类，则返回k与x的比对结果（传入的k一定保证实现了comparable接口）
      * 其他情况返回0
      * 由于方法中使用了强制转换为Comparable类型，特此过滤警告：
+     *
      * @SuppressWarnings({"rawtypes", "unchecked"})
      * 被强制转型对象将由调用方保证实现了Comparable接口
      */
@@ -490,16 +491,16 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
      * @throws IllegalArgumentException 如果传入的initialCapacity为负数则抛此异常
      */
     public ConcurrentHashMap(int initialCapacity) {
-        if (initialCapacity < 0){
+        if (initialCapacity < 0) {
             throw new IllegalArgumentException();
         }
         int cap;
         // 如果传入参数大于设定最大容量则返回最大容量
-        if(initialCapacity >= (MAXIMUM_CAPACITY >>> 1)){
-            cap =  MAXIMUM_CAPACITY;
+        if (initialCapacity >= (MAXIMUM_CAPACITY >>> 1)) {
+            cap = MAXIMUM_CAPACITY;
         }
         // 正常返回离传入值最近的2的次方数作为初始化容量
-        else{
+        else {
             int initialCapacityAndAHalf = initialCapacity + (initialCapacity >>> 1) + 1;
             cap = tableSizeFor(initialCapacityAndAHalf);
         }
@@ -508,13 +509,13 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Creates a new map with the same mappings as the given map.
+     * 使用已有的aMap创建一个新ConcurrentHashMap，并将aMap所有元素放入
      *
-     * @param m the map
+     * @param aMap the map
      */
-    public ConcurrentHashMap(Map<? extends K, ? extends V> m) {
+    public ConcurrentHashMap(Map<? extends K, ? extends V> aMap) {
         this.sizeCtl = DEFAULT_CAPACITY;
-        putAll(m);
+        putAll(aMap);
     }
 
     /**
@@ -656,80 +657,151 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Maps the specified key to the specified value in this table.
-     * Neither the key nor the value can be null.
-     * <p>
-     * <p>The value can be retrieved by calling the {@code get} method
-     * with a key that is equal to the original key.
+     * 使用key计算并将value按照计算结果放入table中
+     * key和value都不能为null
+     * 可以使用get方法来检索key值对应的value
      *
-     * @param key   key with which the specified value is to be associated
-     * @param value value to be associated with the specified key
-     * @return the previous value associated with {@code key}, or
-     * {@code null} if there was no mapping for {@code key}
-     * @throws NullPointerException if the specified key or value is null
+     * @param key   value相关的key
+     * @param value key相关的value
+     * @return 返回在put之前的原始value值，如果之前key值不对应任何value，则返回null
+     * @throws NullPointerException 如果key或value为null则抛出空指针异常
      */
     public V put(K key, V value) {
         return putVal(key, value, false);
     }
 
     /**
-     * Implementation for put and putIfAbsent
+     * put 和 putIfAbsent 的实现方法
+     * @param onlyIfAbsent 即如果当前map中不含key对应的键值对，则放入map中，否则不做任何操作
      */
     final V putVal(K key, V value, boolean onlyIfAbsent) {
+
+        // 如果key或value为null则抛出空指针异常
         if (key == null || value == null) throw new NullPointerException();
+        // 按照key的hash值计算其所在的node链表在table中的位置
         int hash = spread(key.hashCode());
+        // table中存放key值对应位置上的node链表的元素个数
         int binCount = 0;
-        for (Node<K, V>[] tab = table; ; ) {
-            Node<K, V> f;
-            int n, i, fh;
-            if (tab == null || (n = tab.length) == 0)
-                tab = initTable();
-            else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
-                if (casTabAt(tab, i, null,
-                        new Node<K, V>(hash, key, value, null)))
-                    break;                   // no lock when adding to empty bin
-            } else if ((fh = f.hash) == MOVED)
-                tab = helpTransfer(tab, f);
-            else {
+
+        // 开始更新value
+        Node<K, V>[] currentTable = table;
+        while (true) {
+
+            // 传入的key值前一个可能对应的node, 稍后将使用tabAt方法取出
+            Node<K, V> headNode;
+            // 头node的哈希值
+            int headNodeHash;
+
+            // 如果table为null或长度为0，则初始化table
+            if (currentTable == null || currentTable.length == 0) {
+                currentTable = initTable();
+            }
+
+            // 当前table的长度
+            int tableLength = currentTable.length;
+            // 计算头node应该所在的位置索引
+            int headNodeIndex = (tableLength - 1) & hash;
+            // 获取头node
+            headNode = tabAt(currentTable, headNodeIndex);
+
+            // 如果头node不存在，则直接将现有的key和value初始化为一个新node并放入到table中
+            Node<K, V> newNode = new Node<>(hash, key, value, null);
+            if (headNode == null) {
+                // 之前没有值则此位置一定未上锁，直接更新值
+                boolean putResult = casTabAt(currentTable, headNodeIndex, null, newNode);
+                // 如果put值成功则直接跳出循环并返回
+                if (putResult) {
+                    TestUtils.log("将key值为：" + key + "的value：" + value + "成功放入map。");
+                    break;
+                }
+            }
+
+            // 头node存在，且table正在调整容量(头node的哈希值为-1)
+            if (headNode != null && headNode.hash == MOVED) {
+                currentTable = helpTransfer(currentTable, headNode);
+            }
+
+            // 头node存在且table没有正在调整容量
+            if (headNode != null && headNode.hash != MOVED) {
+
+                // 初始化返回值
                 V oldVal = null;
-                synchronized (f) {
-                    if (tabAt(tab, i) == f) {
-                        if (fh >= 0) {
+                // 头node的哈希值
+                headNodeHash = headNode.hash;
+
+                // 把将要操作的头node加对象锁，其他要操作此node的线程将阻塞等待
+                synchronized (headNode) {
+
+                    // 使用cas方法tabAt取出位于headNodeIndex的node
+                    Node<K, V> tempHeadNode = tabAt(currentTable, headNodeIndex);
+
+                    // 如果取出的node就是头node
+                    if (tempHeadNode == headNode) {
+
+                        // 如果头node的哈希值大于0（说明table的当前位置存放的仍然是node数组，没有转化为红黑树结构）
+                        if (headNodeHash >= 0) {
+
                             binCount = 1;
-                            for (Node<K, V> e = f; ; ++binCount) {
-                                K ek;
-                                if (e.hash == hash &&
-                                        ((ek = e.key) == key ||
-                                                (ek != null && key.equals(ek)))) {
-                                    oldVal = e.val;
+                            // 从头node开始遍历位于table当前位置的node链表
+                            Node<K, V> currentNode = headNode;
+                            while (true) {
+                                K currentNodeKey;
+
+                                // 如果当前node与新node的哈希值相同、key值相同（内存地址相同、值也相同）
+                                // 则将新值更新至当前node
+                                if (currentNode.hash == hash &&
+                                        ((currentNodeKey = currentNode.key) == key ||
+                                                (currentNodeKey != null && key.equals(currentNodeKey)))) {
+
+                                    // 取出旧值放入新值，并跳出循环返回
+                                    oldVal = currentNode.val;
                                     if (!onlyIfAbsent)
-                                        e.val = value;
+                                        currentNode.val = value;
                                     break;
                                 }
-                                Node<K, V> pred = e;
-                                if ((e = e.next) == null) {
-                                    pred.next = new Node<K, V>(hash, key,
-                                            value, null);
+
+                                // 将当前node标记为前一个node，并取下一个node为当前node
+                                Node<K, V> previousNode = currentNode;
+                                currentNode = currentNode.next;
+                                // 如果下一个node为空，则说明已经遍历至node链表的结尾
+                                // 将传入的key和value创建为新的node并放在node链表的结尾
+                                if (currentNode == null) {
+                                    previousNode.next = new Node<>(hash, key, value, null);
                                     break;
                                 }
+
+                                // 当前链表元素计数累计+1
+                                binCount++;
                             }
-                        } else if (f instanceof TreeBin) {
-                            Node<K, V> p;
+                        }
+                        // 如果table当前位置已经红黑树化
+                        else if (headNode instanceof TreeBin) {
                             binCount = 2;
-                            if ((p = ((TreeBin<K, V>) f).putTreeVal(hash, key,
-                                    value)) != null) {
-                                oldVal = p.val;
+                            // 尝试将新value放入红黑树中（并不更新value）
+                            Node<K, V> previousNode = ((TreeBin<K, V>) headNode).putTreeVal(hash, key, value);
+                            // 如果放入后是替换了某一个树节点，则返回此节点
+                            if (previousNode != null) {
+                                // 取出旧值放入新值，并返回
+                                oldVal = previousNode.val;
                                 if (!onlyIfAbsent)
-                                    p.val = value;
+                                    previousNode.val = value;
                             }
                         }
                     }
                 }
+
+                // 如果binCount大于0且超过了转树阈值
+                // 则将处于当前位置的node链表转为红黑树结构，以便于检索
                 if (binCount != 0) {
-                    if (binCount >= TREEIFY_THRESHOLD)
-                        treeifyBin(tab, i);
-                    if (oldVal != null)
+                    // 已经超过红黑树化的元素个数阈值
+                    if (binCount >= TREEIFY_THRESHOLD) {
+                        // 将当前node链表红黑树化
+                        treeifyBin(currentTable, headNodeIndex);
+                    }
+                    // 如果前node旧值不为null则返回
+                    if (oldVal != null){
                         return oldVal;
+                    }
                     break;
                 }
             }
@@ -739,15 +811,16 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Copies all of the mappings from the specified map to this one.
-     * These mappings replace any mappings that this map had for any of the
-     * keys currently in the specified map.
+     * 将传入map中的所有元素复制到现有的concurrentHashMap中
+     * 如果key值已经存在，则对应的value会被替换
      *
-     * @param m mappings to be stored in this map
+     * @param aMap 将要被存储至当前ConcurrentHashMap的map
      */
-    public void putAll(Map<? extends K, ? extends V> m) {
-        tryPresize(m.size());
-        for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
+    public void putAll(Map<? extends K, ? extends V> aMap) {
+        // 在正式放入传入map的所有元素前，重新调整大小以能继续操作
+        tryPresize(aMap.size());
+        // 遍历传入的map并将键值对逐个放入concurrentHashMap中
+        for (Map.Entry<? extends K, ? extends V> e : aMap.entrySet())
             putVal(e.getKey(), e.getValue(), false);
     }
 
