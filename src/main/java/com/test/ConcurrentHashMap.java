@@ -465,20 +465,20 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     private transient volatile int cellsBusy;
 
     /**
-     * Table of counter cells. When non-null, size is a power of 2.
+     * 并发元素table，当不为null时其容量为2的次方数
      */
     private transient volatile CounterCell[] counterCells;
 
-    // views
+    // 视图
     private transient KeySetView<K, V> concurrentHashMapKeySet;
     private transient ValuesView<K, V> concurrentHashMapValues;
     private transient EntrySetView<K, V> entrySet;
 
 
-    /* ---------------- Public operations -------------- */
+    /* ---------------- 公共操作 -------------- */
 
     /**
-     * Creates a new, empty map with the default initial table size (16).
+     * 建立一个容量位16的新的空map
      */
     public ConcurrentHashMap() {
     }
