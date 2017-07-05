@@ -484,21 +484,26 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Creates a new, empty map with an initial table size
-     * accommodating the specified number of elements without the need
-     * to dynamically resize.
+     * 使用table size建立一个新的空map，table size的值能满足在此容量下table无需动态扩容
      *
-     * @param initialCapacity The implementation performs internal
-     *                        sizing to accommodate this many elements.
-     * @throws IllegalArgumentException if the initial capacity of
-     *                                  elements is negative
+     * @param initialCapacity 调用者预期放入map内的元素个数
+     * @throws IllegalArgumentException 如果传入的initialCapacity为负数则抛此异常
      */
     public ConcurrentHashMap(int initialCapacity) {
-        if (initialCapacity < 0)
+        if (initialCapacity < 0){
             throw new IllegalArgumentException();
-        int cap = ((initialCapacity >= (MAXIMUM_CAPACITY >>> 1)) ?
-                MAXIMUM_CAPACITY :
-                tableSizeFor(initialCapacity + (initialCapacity >>> 1) + 1));
+        }
+        int cap;
+        // 如果传入参数大于设定最大容量则返回最大容量
+        if(initialCapacity >= (MAXIMUM_CAPACITY >>> 1)){
+            cap =  MAXIMUM_CAPACITY;
+        }
+        // 正常返回离传入值最近的2的次方数作为初始化容量
+        else{
+            int initialCapacityAndAHalf = initialCapacity + (initialCapacity >>> 1) + 1;
+            cap = tableSizeFor(initialCapacityAndAHalf);
+        }
+        // 将值赋予sizeCtl
         this.sizeCtl = cap;
     }
 
