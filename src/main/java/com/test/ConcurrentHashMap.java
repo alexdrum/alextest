@@ -657,7 +657,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * 使用key计算并将value按照计算结果放入table中
+     * 使用key计算并将value按照计算结果放入table中的某一个node链表或红黑树中
      * key和value都不能为null
      * 可以使用get方法来检索key值对应的value
      *
@@ -672,22 +672,22 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
 
     /**
      * put 和 putIfAbsent 的实现方法
-     * @param onlyIfAbsent 即如果当前map中不含key对应的键值对，则放入map中，否则不做任何操作
+     * @param onlyIfAbsent 即如果当前map中不含传入key对应的键值对，则放入map中，否则不做任何操作
      */
     final V putVal(K key, V value, boolean onlyIfAbsent) {
 
         // 如果key或value为null则抛出空指针异常
         if (key == null || value == null) throw new NullPointerException();
-        // 按照key的hash值计算其所在的node链表在table中的位置
+        // 按照key的hash值计算其应插入node链表在table中的位置
         int hash = spread(key.hashCode());
-        // table中存放key值对应位置上的node链表的元素个数
+        // 对应node链表的元素个数，用于找到链表后进行计数以便于是否做红黑树化的判断
         int binCount = 0;
 
         // 开始更新value
         Node<K, V>[] currentTable = table;
         while (true) {
 
-            // 传入的key值前一个可能对应的node, 稍后将使用tabAt方法取出
+            // key值对应node链表的头, 稍后将使用tabAt方法取出
             Node<K, V> headNode;
             // 头node的哈希值
             int headNodeHash;
@@ -704,19 +704,20 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
             // 获取头node
             headNode = tabAt(currentTable, headNodeIndex);
 
-            // 如果头node不存在，则直接将现有的key和value初始化为一个新node并放入到table中
+            // 如果头node不存在，则直接将现有的key和value初始化为一个新node当做链表头并放入到table中
             Node<K, V> newNode = new Node<>(hash, key, value, null);
             if (headNode == null) {
-                // 之前没有值则此位置一定未上锁，直接更新值
+                // 之前没有值则此位置一定未上锁，直接使用cas方法更新值
                 boolean putResult = casTabAt(currentTable, headNodeIndex, null, newNode);
                 // 如果put值成功则直接跳出循环并返回
                 if (putResult) {
-                    TestUtils.log("将key值为：" + key + "的value：" + value + "成功放入map。");
+                    TestUtils.log("key值为：" + key + "的value：" + value + "作为table的"
+                            + headNodeIndex + "位置新建链表头成功放入map。");
                     break;
                 }
             }
 
-            // 头node存在，且table正在调整容量(头node的哈希值为-1)
+            // 头node存在，但table正在调整容量(头node的哈希值为-1)
             if (headNode != null && headNode.hash == MOVED) {
                 currentTable = helpTransfer(currentTable, headNode);
             }
@@ -729,7 +730,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                 // 头node的哈希值
                 headNodeHash = headNode.hash;
 
-                // 把将要操作的头node加对象锁，其他要操作此node的线程将阻塞等待
+                // 把将要操作的头node加对象锁，其他要操作此node链表的线程将阻塞等待
                 synchronized (headNode) {
 
                     // 使用cas方法tabAt取出位于headNodeIndex的node
@@ -1893,12 +1894,15 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         return new KeySetView<K, V>(this, mappedValue);
     }
 
-    /* ---------------- Special Nodes -------------- */
+    /* ---------------- 特殊节点 -------------- */
 
     /**
-     * A node inserted at head of bins during transfer operations.
+     * 一个用于连接两个table的节点类。它包含一个nextTable指针，用于指向下一张表
+     * 而且这个节点的key value next指针全部为null，它的hash值为-1
      */
     static final class ForwardingNode<K, V> extends Node<K, V> {
+
+        // 指向扩容后下一张的指针
         final Node<K, V>[] nextTable;
 
         ForwardingNode(Node<K, V>[] tab) {
@@ -2040,6 +2044,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
      * Helps transfer if a resize is in progress.
      */
     final Node<K, V>[] helpTransfer(Node<K, V>[] tab, Node<K, V> f) {
+        //
         Node<K, V>[] nextTab;
         int sc;
         if (tab != null && (f instanceof ForwardingNode) &&
