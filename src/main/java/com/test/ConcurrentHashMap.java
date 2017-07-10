@@ -1952,11 +1952,11 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         }
     }
 
-    /* ---------------- Table Initialization and Resizing -------------- */
+    /* ---------------- table的初始化和容量调整 -------------- */
 
     /**
-     * Returns the stamp bits for resizing a table of size n.
-     * Must be negative when shifted left by RESIZE_STAMP_SHIFT.
+     * 返回容量为n的table的扩容标志位
+     * 当使用RESIZE_STAMP_SHIFT做左移操作时必须为负
      */
     static final int resizeStamp(int n) {
         return Integer.numberOfLeadingZeros(n) | (1 << (RESIZE_STAMP_BITS - 1));
@@ -2041,28 +2041,45 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Helps transfer if a resize is in progress.
+     * 这是一个协助扩容的方法。这个方法被调用的时候，当前ConcurrentHashMap一定已经有了nextTable对象
+     * 首先拿到这个nextTable对象，调用transfer方法。回看上面的transfer方法可以看到，当本线程进入扩容方法的时候会直接进入复制阶段
      */
-    final Node<K, V>[] helpTransfer(Node<K, V>[] tab, Node<K, V> f) {
-        //
-        Node<K, V>[] nextTab;
-        int sc;
-        if (tab != null && (f instanceof ForwardingNode) &&
-                (nextTab = ((ForwardingNode<K, V>) f).nextTable) != null) {
-            int rs = resizeStamp(tab.length);
-            while (nextTab == nextTable && table == tab &&
-                    (sc = sizeCtl) < 0) {
-                if ((sc >>> RESIZE_STAMP_SHIFT) != rs || sc == rs + 1 ||
-                        sc == rs + MAX_RESIZERS || transferIndex <= 0)
-                    break;
-                if (UNSAFE.compareAndSwapInt(this, SIZE_CTL, sc, sc + 1)) {
-                    transfer(tab, nextTab);
-                    break;
+    final Node<K, V>[] helpTransfer(Node<K, V>[] currentTable, Node<K, V>headNode) {
+        // 指向扩容后table的指针node
+        Node<K, V>[] nextTable;
+
+        // 如果当前table不为null
+        // 且当前传入的链表头结点forwardingNode是指向扩容后nextTable的指针node
+        // 且forwardingNode指向的nextTable不为null
+        if (currentTable != null &&
+                (headNode instanceof ForwardingNode)) {
+            ForwardingNode<K, V> forwardingNode = (ForwardingNode<K, V>) headNode;
+            nextTable = forwardingNode.nextTable;
+            if(nextTable != null){
+                // 获得table扩容的标记位
+                int resizeStamp = resizeStamp(currentTable.length);
+                // 获得当前sizeCtrl的值
+                int currentSizeCtrl = sizeCtl;
+                // 当从forwardingNode指向的nextTable就是本类的nextTable
+                // 且传入的currentTable就是本类的table
+                // 且当前table正在扩容中（sizeCtrl为负数，具体看这个属性的定义）
+                while (nextTable == this.nextTable
+                        && currentTable == this.table
+                        && currentSizeCtrl < 0) {
+                    if ((currentSizeCtrl >>> RESIZE_STAMP_SHIFT) != resizeStamp
+                            || currentSizeCtrl == resizeStamp + 1
+                            || currentSizeCtrl == resizeStamp + MAX_RESIZERS
+                            || transferIndex <= 0)
+                        break;
+                    if (UNSAFE.compareAndSwapInt(this, SIZE_CTL, currentSizeCtrl, currentSizeCtrl + 1)) {
+                        transfer(currentTable, nextTable);
+                        break;
+                    }
                 }
             }
-            return nextTab;
+            return nextTable;
         }
-        return table;
+        return this.table;
     }
 
     /**
