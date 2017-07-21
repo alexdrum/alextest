@@ -32,4 +32,8 @@ public class ShiftTest {
         Integer var3 = 0x7fffffff;
         System.out.println(TestUtils.toFullBinaryString(var3));
     }
+
+    public static void andTest() {
+        long nowTime = 20170717000000L;
+    }
 }
