@@ -2,7 +2,6 @@ package com.test;
 
 import com.google.common.collect.Lists;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.hssf.util.HSSFColor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -15,7 +14,9 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
+import java.net.*;
 import java.util.List;
 
 import static com.test.TestConst.*;
@@ -26,16 +27,19 @@ import static com.test.TestConst.*;
 public class GetCompanyInfo {
 
     public static void main(String[] args) throws IOException {
-        saveFromTianYanCha();
+        saveFromTianYanCha(true);
     }
 
     /**
      * 通过种子信息向天眼通抓取企业信息
      */
-    public static void saveFromTianYanCha() throws IOException {
+    public static void saveFromTianYanCha(boolean isDev) throws IOException {
 
         // 从excel文件中获取种子关键字集合
         List<String> keyList = Lists.newArrayList();
+        if(isDev){
+            keyList.add("自如");
+        }
         String filePath = TestConst.WIN_ROOT;
         String os = System.getProperty("os.name");
         if (!os.toLowerCase().startsWith("win")) {
@@ -43,34 +47,37 @@ public class GetCompanyInfo {
         }
         String fullPathFileName = filePath + SEED_FILE;
         InputStream stream = new FileInputStream(fullPathFileName);
-        XSSFWorkbook wb = new XSSFWorkbook();
 
         // 抓取数据
         try {
+
             long nowTime = DateUtils.formatNow2Long();
             XSSFSheet sheet;
             XSSFRow row;
-            try {
-                wb = new XSSFWorkbook(stream);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            XSSFWorkbook wb = null;
 
-            sheet = wb.getSheetAt(0);
-            // 得到总行数
-            int rowNum = sheet.getLastRowNum();
-            row = sheet.getRow(0);
-            // 正文内容应该从第二行开始,第一行为表头的标题
-            for (int i = 1; i <= rowNum; i++) {
-                row = sheet.getRow(i);
-                XSSFCell xssfCell = row.getCell(0);
+            if(!isDev) {
                 try {
-                    String keyWord = xssfCell.getRichStringCellValue().getString();
-                    //把刚获取的列存入list
-                    keyList.add(keyWord);
-                    TestUtils.log("已读取第" + i + "条数据：" + keyWord);
-                } catch (IllegalStateException e) {
-                    continue;
+                    wb = new XSSFWorkbook(stream);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                sheet = wb.getSheetAt(0);
+                // 得到总行数
+                int rowNum = sheet.getLastRowNum();
+                row = sheet.getRow(0);
+                // 正文内容应该从第二行开始,第一行为表头的标题
+                for (int i = 1; i <= rowNum; i++) {
+                    row = sheet.getRow(i);
+                    XSSFCell xssfCell = row.getCell(0);
+                    try {
+                        String keyWord = xssfCell.getRichStringCellValue().getString();
+                        //把刚获取的列存入list
+                        keyList.add(keyWord);
+                        TestUtils.log("已读取第" + i + "条数据：" + keyWord);
+                    } catch (IllegalStateException e) {
+                        continue;
+                    }
                 }
             }
 
@@ -86,15 +93,32 @@ public class GetCompanyInfo {
             int crawlerCounter = 1;
             // 通过关键字从目标网站上抓取数据
             for (String keyWord : keyList) {
-                String searchURL = TIAN_YAN_CHA_PREFIX + keyWord + TIAN_YAN_CHA_SUFFIX;
+//                String searchURL = TIAN_YAN_CHA_PREFIX + keyWord + TIAN_YAN_CHA_SUFFIX;
+                String searchURL = "http://www.baidu.com";
                 Document doc = null;
                 try {
-                    doc = Jsoup.connect(searchURL).get();
+                    Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("124.206.107.125", 3128));
+                    URL url = new URL(searchURL);
+                    HttpURLConnection uc = (HttpURLConnection)url.openConnection(proxy);
+                    uc.connect();
+                    InputStream is = uc.getInputStream();
+                    BufferedReader buffer = new BufferedReader(new InputStreamReader(is));
+                    StringBuffer bs = new StringBuffer();
+                    String l;
+                    while ((l = buffer.readLine()) != null) {
+                        bs.append(l);
+                    }
+                    System.out.println(bs.toString());
+                    doc = Jsoup.parse(bs.toString());
+
+//                    doc = Jsoup.connect(searchURL).get();
                 } catch (IOException ioException) {
                     TestUtils.log("获取网页失败！");
+                    ioException.printStackTrace();
                 }
 
                 TestUtils.log("已成功获取当前第" + crawlerCounter + "个关键词：" + keyWord + " 的搜索结果页面；");
+                TestUtils.log(doc.toString());
 
                 Elements elements = doc.getElementsByClass("search_result_single search-2017 pb20 pt20 pl30 pr30");
                 if (CollectionUtils.isEmpty(elements)) {
@@ -197,29 +221,22 @@ public class GetCompanyInfo {
             String title[] = {"公司名称", "企业法人", "所在省份", "注册资金(元)", "建立日期", "品牌名称", "图片地址", "抓取时间"};
             writer(path, fileName, fileType, list, title);
 
+            wb.close();
         } catch (Exception e) {
             TestUtils.log(e);
         } finally {
             stream.close();
-            wb.close();
         }
     }
 
     @SuppressWarnings("resource")
     public static void writer(String path, String fileName, String fileType, List<CompanyEntity> list, String titleRow[]) throws IOException, SimpleException {
-        Workbook wb;
+
+        //创建工作文档对象
+        Workbook wb = new XSSFWorkbook();
         String excelPath = path + File.separator + fileName + "." + fileType;
         File file = new File(excelPath);
         Sheet sheet = null;
-
-        //创建工作文档对象
-        if (fileType.equals("xls")) {
-            wb = new HSSFWorkbook();
-        } else if (fileType.equals("xlsx")) {
-            wb = new XSSFWorkbook();
-        } else {
-            throw new SimpleException("文件格式不正确");
-        }
 
         //创建sheet对象
         if (!file.exists()) {
@@ -286,9 +303,15 @@ public class GetCompanyInfo {
 
         //创建文件流
         OutputStream stream = new FileOutputStream(excelPath);
-        //写入数据
-        wb.write(stream);
-        //关闭文件流
-        stream.close();
+        try {
+            //写入数据
+            wb.write(stream);
+        } catch (Exception e) {
+            TestUtils.log("写入文件失败");
+        } finally {
+            //关闭文件流
+            stream.close();
+        }
+        wb.close();
     }
 }
