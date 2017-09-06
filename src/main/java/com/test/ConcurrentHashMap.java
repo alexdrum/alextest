@@ -1963,7 +1963,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Initializes table, using the size recorded in sizeCtl.
+     * 使用sizeCtl作为大小初始化table.
      */
     private final Node<K, V>[] initTable() {
         Node<K, V>[] tab;
