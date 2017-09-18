@@ -60,6 +60,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
 
     /**
      * 本类中table的最大容量.  该值必须正好为1 << 30，以保持在两个
+     *
      * table大小的幂的Java数组分配和索引限制之内。再次，32bit 最高
      * 两bit将用于控制和调度
      */
@@ -519,17 +520,16 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Creates a new, empty map with an initial table size based on
-     * the given number of elements ({@code initialCapacity}) and
-     * initial table density ({@code loadFactor}).
+     * 新建一个空map，其table的初始化大小由给定的元素数量 {@code initialCapacity})
+     * 和初始化table密度：即实际可承载最多的元素个数除以其容量得到的值，比如容量为1000，实际最多承载750个元素，
+     * 那么这个值就是0.75，我们也管它叫装载因子 ({@code loadFactor})
+     * 因为一个数据结构不管多大，都不能把它装满，一定要预留些空间防止其出错
+     * 如果一个容量为1000的数据结构装载因子是0.75，则元素一旦达到 750个就会自动扩容
+     * 以免内容溢出造成错误
      *
-     * @param initialCapacity the initial capacity. The implementation
-     *                        performs internal sizing to accommodate this many elements,
-     *                        given the specified load factor.
-     * @param loadFactor      the load factor (table density) for
-     *                        establishing the initial table size
-     * @throws IllegalArgumentException if the initial capacity of
-     *                                  elements is negative or the load factor is nonpositive
+     * @param  initialCapacity 初始化容量。在给定了负载因子的前提下，代码实现执行内部调整以容纳这些元素
+     * @param  loadFactor       装载因子，内容见上
+     * @throws IllegalArgumentException 如果初始化容量为负数或装载因子为非正时抛出此异常
      * @since 1.6
      */
     public ConcurrentHashMap(int initialCapacity, float loadFactor) {
