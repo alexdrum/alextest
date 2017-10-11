@@ -140,10 +140,10 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     static class Node<K, V> implements Map.Entry<K, V> {
 
         // 属性声明
-        final int hash;             // 哈希值
-        final K key;                 // key
-        volatile V val;             // value
-        volatile Node<K, V> next;    // 当头node的下一个node
+        final int hash;              // 哈希值
+        final K key;                  // key
+        volatile V val;              // value
+        volatile Node<K, V> next;    // 当前node的下一个node
 
         // 构造方法
         Node(int hash, K key, V val, Node<K, V> next) {
@@ -153,7 +153,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
             this.next = next;
         }
 
-        // getter、setter、toString
+        // getter、setter、toString 方法
         public final K getKey() {
             return key;
         }
@@ -176,6 +176,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
 
         // equals方法
         public final boolean equals(Object o) {
+
             Object key;
             Object value;
             Map.Entry<?, ?> toBeComparedEntry;
@@ -213,9 +214,10 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
 
         /**
          * 为map.get()提供虚拟化支持；子类中会被重写.
+         * 译注：本方法用来在以当前node为表头的node链表中查找目标对象
          */
         Node<K, V> find(int toBeFoundNodeHash, Object toBeFoundNodeKey) {
-            // 当头node
+            // 当前node
             Node<K, V> currentNode = this;
             // 如果待查找的key不为null
             if (toBeFoundNodeKey != null) {
@@ -400,8 +402,8 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     /* ---------------- 类属性 -------------- */
 
     /**
-     * The array of bins. Lazily initialized upon first insertion.
-     * Size is always a power of two. Accessed directly by iterators.
+     * 用来装载键值对链表（或树）的数组，只有在第一次插入操作发生时才会懒加载
+     * 大小永远为一个2的次方数，可以通过游标直接访问
      */
     transient volatile Node<K, V>[] table;
 
