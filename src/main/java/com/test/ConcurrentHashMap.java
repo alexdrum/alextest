@@ -1,33 +1,5 @@
 /*
  * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
-
-/*
- *
- *
- *
- *
- *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
  * http://creativecommons.org/publicdomain/zero/1.0/
@@ -55,14 +27,11 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         implements ConcurrentMap<K, V>, Serializable {
     private static final long serialVersionUID = 7249069246763182397L;
 
-
     /* ---------------- 常量 -------------- */
 
     /**
-     * 本类中table的最大容量.  该值必须正好为1 << 30，以保持在两个
-     *
-     * table大小的幂的Java数组分配和索引限制之内。再次，32bit 最高
-     * 两bit将用于控制和调度
+     * 本类中table的最大容量，该值必须正好为1 << 30，以保持在两个
+     * table大小的幂的Java数组分配和索引限制之内。再次，32bit 最高两bit将用于控制和调度
      */
     private static final int MAXIMUM_CAPACITY = 1 << 30;
 
@@ -84,11 +53,13 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     private static final int DEFAULT_CONCURRENCY_LEVEL = 16;
 
     /**
-     * table的装载因子. Overrides of this value in
-     * constructors affect only the initial table capacity.  The
-     * actual floating point value isn't normally used -- it is
-     * simpler to use expressions such as {@code n - (n >>> 2)} for
-     * the associated resizing threshold.
+     * table的装载因子。在构造器中覆盖此值只会影响table初始容量
+     * 真正的浮点值一般不常用，而使用像 {@code n - (n >>> 2)} 这种表达式来控制扩容阈值更加简单
+     * 以上是源代码英文版本注释，写的像他妈狗屎一样，我再用原生中文解释一下：
+     * 如果负载因子是默认的0.75，HashMap(16)的时候，占16个内存空间，实际上只用到了12个，超过12个就会触发扩容
+     * 如果负载因子是1的话，HashMap(16)的时候，占16个内存空间，实际上会填满16个以后才会扩容
+     * 但是，用到的空间越多，hashcode重复的可能性就越大，同一个空间里面的元素数目就可能会增加，会增加查找的时间
+     * 相反用到的空间越小，同一空间里元素数目就少，减少查找时间
      */
     private static final float LOAD_FACTOR = 0.75f;
 
@@ -103,41 +74,38 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     static final int UNTREEIFY_THRESHOLD = 6;
 
     /**
-     * 在table被转为树形结构前的最小容量
-     * (否则如果table中的bin有太多节点就会被转为树形结构)
-     * 值最小应为 4 * TREEIFY_THRESHOLD
-     * 以规避容量调整和树形化阈值之间的冲突
+     * 在某一链表被转为树形结构前的最小容量` (否则如果table中的bin有太多节点就会被转为树形结构)
+     * 值最小应为 4 * TREEIFY_THRESHOLD，以规避容量调整和树形化阈值之间的冲突
      */
     static final int MIN_TREEIFY_CAPACITY = 64;
 
     /**
-     * Minimum number of rebinnings per transfer step. Ranges are
-     * subdivided to allow multiple resizer threads.  This value
-     * serves as a lower bound to avoid resizers encountering
-     * excessive memory contention.  The value should be at least
-     * DEFAULT_CAPACITY.
+     * 在树形转为链表时，多个线程进行协作时一次性可操作的数据量
+     * 它是一个底线，用来避免转换时出现内存溢出的情况
+     * 它的的值不能小于 DEFAULT_CAPACITY
      */
     private static final int MIN_TRANSFER_STRIDE = 16;
 
+    // 以下两个是用来控制扩容的时候 单线程进入的变量
     /**
-     * The number of bits used for generation stamp in sizeCtl.
-     * Must be at least 6 for 32bit arrays.
+     * sizeCtl中年代戳所使用的位（bit）数
+     * 至少为6位，这样才能装下32个数
      */
     private static int RESIZE_STAMP_BITS = 16;
 
     /**
-     * The maximum number of threads that can help resize.
-     * Must fit in 32 - RESIZE_STAMP_BITS bits.
+     * 扩容时的最大线程数
+     * 其数值应满足 32 - RESIZE_STAMP_BITS 位
      */
     private static final int MAX_RESIZERS = (1 << (32 - RESIZE_STAMP_BITS)) - 1;
 
     /**
-     * The bit shift for recording size stamp in sizeCtl.
+     * 用来记录sizeCtl中容量戳的位移值
      */
     private static final int RESIZE_STAMP_SHIFT = 32 - RESIZE_STAMP_BITS;
 
     /*
-     * Encodings for Node hash fields. See above for explanation.
+     * 为Node的哈希值字段加密的值，看一下上边的解释
      */
     static final int MOVED = -1; // 下个节点的hash值
     static final int TREEBIN = -2; // 树结构根节点的hash值
