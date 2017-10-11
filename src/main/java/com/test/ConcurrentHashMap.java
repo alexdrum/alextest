@@ -3,6 +3,11 @@
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
  * http://creativecommons.org/publicdomain/zero/1.0/
+ *
+ * 鼓赵翻译
+ * 专有名词：
+ * bin：用来封装一个键值对的“容器”
+ * table：用来存放键值对链表的表格
  */
 
 package com.test;
@@ -129,10 +134,8 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     /* ---------------- Nodes -------------- */
 
     /**
-     * 键值对. 本类是一个从未暴露给用户使用的 Map.Entry
-     * 但可以在主任务中的只读遍历操作中使用
-     * 其中一个Node的子类较为特殊，其hash属性可为负值，并且key或value可为null
-     * 否则其他情况key和value都不能为null
+     * 键值对。本类是一个从未暴露给用户使用的 Map.Entry，但可以在主任务中的只读遍历操作中使用
+     * 其中一个Node的子类较为特殊，其hash属性可为负值，并且key或value可为null，否则其他情况key和value都不能为null
      */
     static class Node<K, V> implements Map.Entry<K, V> {
 
