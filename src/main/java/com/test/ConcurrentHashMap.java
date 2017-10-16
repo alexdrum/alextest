@@ -12,6 +12,7 @@
 
 package com.test;
 
+import lombok.extern.slf4j.Slf4j;
 import sun.misc.Unsafe;
 
 import java.io.ObjectStreamField;
@@ -28,6 +29,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.*;
 
+@Slf4j
 public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         implements ConcurrentMap<K, V>, Serializable {
     private static final long serialVersionUID = 7249069246763182397L;
@@ -242,15 +244,27 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
 
     /* ---------------- 静态方法 -------------- */
 
-    //调整hash值分布的方法，类似于HashMap中的hash(Object key)方法
-    static final int spread(int h) {
+    // 用来散列节点的方法，其中的运算能够保证节点的存储位置更加均匀，类似于HashMap中的hash(Object key)方法
+    static final int spread(int hashCode) {
+
+        log.info("【spread方法】开始：当前传入的 hashCode 二进制为：" + TestUtils.toFullBinaryString(hashCode) + "，原值为：" + hashCode);
+
         // java的int类型为32位
         // 先将传入的h无符号右移16位
-        int unsignedRightShiftedH = h >>> 16;
+        int unsignedRightShiftedH = hashCode >>> 16;
+        log.info("【spread方法】将传入的hash值右移16位后的新值 unsignedRightShiftedH 二进制为："
+                + TestUtils.toFullBinaryString(unsignedRightShiftedH) + "，原值为：" + unsignedRightShiftedH);
+
         // 高16位不变，低16位与高16位进行了异或运算
-        int xorWithUnsignedRightShiftedH = h ^ unsignedRightShiftedH;
+        int xorWithUnsignedRightShiftedH = hashCode ^ unsignedRightShiftedH;
+        log.info("【spread方法】将 hashCode 与 unsignedRightShiftedH 进行异或运算后，结果二进制为："
+                + TestUtils.toFullBinaryString(xorWithUnsignedRightShiftedH) + "，原值为：" + xorWithUnsignedRightShiftedH);
+
         // 最后再取低31位，最高一位舍弃
         int returnValue = xorWithUnsignedRightShiftedH & HASH_BITS;
+        log.info("【spread方法】将 xorWithUnsignedRightShiftedH 最高一位舍弃，结果二进制为："
+                + TestUtils.toFullBinaryString(xorWithUnsignedRightShiftedH) + "，原值为：" + xorWithUnsignedRightShiftedH);
+
         return returnValue;
     }
 
@@ -408,11 +422,12 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     transient volatile Node<K, V>[] table;
 
     /**
-     * The next table to use; non-null only while resizing.
+     * 用于扩容的备用table
      */
     private transient volatile Node<K, V>[] nextTable;
 
     /**
+     * 基础计数器，大概没有线程竞争时使用
      * Base counter value, used mainly when there is no contention,
      * but also as a fallback during table initialization
      * races. Updated via CAS.
@@ -793,22 +808,21 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Removes the key (and its corresponding value) from this map.
-     * This method does nothing if the key is not in the map.
+     * 从对象中将对应key值的项删除
+     * 如果对象中不含此key，则什么都不做
      *
-     * @param key the key that needs to be removed
-     * @return the previous value associated with {@code key}, or
-     * {@code null} if there was no mapping for {@code key}
-     * @throws NullPointerException if the specified key is null
+     * @param key 移除项的key
+     * @return 删除之前的key值 {@code key}, 如果不包含这个 {@code key} 则返回{@code null}
+     * @throws NullPointerException 指定key值为null抛出此异常
      */
     public V remove(Object key) {
         return replaceNode(key, null, null);
     }
 
     /**
-     * Implementation for the four public remove/replace methods:
-     * Replaces node value with v, conditional upon match of cv if
-     * non-null.  If resulting value is null, delete.
+     * 公共方法 remove/replace 的实现方法
+     * 如果传入的cv与当前Node中的value相等且不为null，则用传入的value替换当前value
+     * 如果传入的cv为null，则直接删除此节点
      */
     final V replaceNode(Object key, V value, Object cv) {
         int hash = spread(key.hashCode());

@@ -10,10 +10,11 @@ public class TestConcurrentHashMap {
 
     private static void test1(){
         ConcurrentHashMap<Object, Object> concurrentHashMap = new ConcurrentHashMap<>(32);
-        int putCount = 3600;
+        int putCount = 100;
         for(int i = 0; i < putCount; i++){
             concurrentHashMap.put(i,i);
         }
         TestUtils.printMap(concurrentHashMap);
+        concurrentHashMap.remove(36);
     }
 }
