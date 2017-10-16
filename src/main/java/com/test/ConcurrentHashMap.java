@@ -247,22 +247,23 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     // 用来散列节点的方法，其中的运算能够保证节点的存储位置更加均匀，类似于HashMap中的hash(Object key)方法
     static final int spread(int hashCode) {
 
-        log.info("【spread方法】开始：当前传入的 hashCode 二进制为：" + TestUtils.toFullBinaryString(hashCode) + "，原值为：" + hashCode);
+        TestUtils.log("【spread方法】                               开始：当前传入的 hashCode 二进制为："
+                + TestUtils.toFullBinaryString(hashCode) + "，原值为：" + hashCode);
 
         // java的int类型为32位
         // 先将传入的h无符号右移16位
         int unsignedRightShiftedH = hashCode >>> 16;
-        log.info("【spread方法】将传入的hash值右移16位后的新值 unsignedRightShiftedH 二进制为："
+        TestUtils.log("【spread方法】    将传入的hash值右移16位后的新值 unsignedRightShiftedH 二进制为："
                 + TestUtils.toFullBinaryString(unsignedRightShiftedH) + "，原值为：" + unsignedRightShiftedH);
 
         // 高16位不变，低16位与高16位进行了异或运算
         int xorWithUnsignedRightShiftedH = hashCode ^ unsignedRightShiftedH;
-        log.info("【spread方法】将 hashCode 与 unsignedRightShiftedH 进行异或运算后，结果二进制为："
+        TestUtils.log("【spread方法】将 hashCode 与 unsignedRightShiftedH 进行异或运算后，结果二进制为："
                 + TestUtils.toFullBinaryString(xorWithUnsignedRightShiftedH) + "，原值为：" + xorWithUnsignedRightShiftedH);
 
         // 最后再取低31位，最高一位舍弃
         int returnValue = xorWithUnsignedRightShiftedH & HASH_BITS;
-        log.info("【spread方法】将 xorWithUnsignedRightShiftedH 最高一位舍弃，结果二进制为："
+        TestUtils.log("【spread方法】       将 xorWithUnsignedRightShiftedH 最高一位舍弃，结果二进制为："
                 + TestUtils.toFullBinaryString(xorWithUnsignedRightShiftedH) + "，原值为：" + xorWithUnsignedRightShiftedH);
 
         return returnValue;
@@ -428,19 +429,15 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
 
     /**
      * 基础计数器，大概没有线程竞争时使用
-     * Base counter value, used mainly when there is no contention,
-     * but also as a fallback during table initialization
-     * races. Updated via CAS.
+     * 也是table 初始化时的一个回退依据，使用CAS方法更新
      */
     private transient volatile long baseCount;
 
     /**
-     * Table initialization and resizing control.  When negative, the
-     * table is being initialized or resized: -1 for initialization,
-     * else -(1 + the number of active resizing threads).  Otherwise,
-     * when table is null, holds the initial table size to use upon
-     * creation, or 0 for default. After initialization, holds the
-     * next element count value upon which to resize the table.
+     * table初始化和扩容控制。当它小于零时，表明table正在初始化或扩容：
+     * -1为正在初始化，当为其他负值时，其绝对值为参与扩容的线程数
+     * 其他情况，在table为null时，其值为初始化时传入的初始化大小值，默认值为0
+     * 在初始化后，保存的是需要扩容时的元素个数
      */
     private transient volatile int sizeCtl;
 
@@ -450,7 +447,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     private transient volatile int transferIndex;
 
     /**
-     * Spinlock (locked via CAS) used when resizing and/or creating CounterCells.
+     * 在扩容或创建一个并发元素时使用的自旋锁（通过CAS方法加锁）
      */
     private transient volatile int cellsBusy;
 

@@ -9,12 +9,12 @@ public class TestConcurrentHashMap {
     }
 
     private static void test1(){
-        ConcurrentHashMap<Object, Object> concurrentHashMap = new ConcurrentHashMap<>(32);
-        int putCount = 100;
+        ConcurrentHashMap<Object, Object> concurrentHashMap = new ConcurrentHashMap<>(88);
+        int putCount = 100000;
         for(int i = 0; i < putCount; i++){
             concurrentHashMap.put(i,i);
         }
-        TestUtils.printMap(concurrentHashMap);
+//        TestUtils.printMap(concurrentHashMap);
         concurrentHashMap.remove(36);
     }
 }
