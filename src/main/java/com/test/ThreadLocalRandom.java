@@ -956,26 +956,21 @@ public class ThreadLocalRandom extends Random {
     // Within-package utilities
 
     /*
-     * Descriptions of the usages of the methods below can be found in
-     * the classes that use them. Briefly, a thread's "probe" value is
-     * a non-zero hash code that (probably) does not collide with
-     * other existing threads with respect to any power of two
-     * collision space. When it does collide, it is pseudo-randomly
-     * adjusted (using a Marsaglia XorShift). The nextSecondarySeed
-     * method is used in the same contexts as ThreadLocalRandom, but
-     * only for transient usages such as random adaptive spin/block
-     * sequences for which a cheap RNG suffices and for which it could
-     * in principle disrupt user-visible statistical properties of the
-     * main ThreadLocalRandom if we were to use it.
+     * 这个方法的用法在使用它的类中可以看到，比如ConcurrentHashMap中的计数方法addCount
+     * 简要来说，一个线程的“探测”值是一个与现存其他线程不冲突、值为2的次方数且不为零的哈希值
+     * 如果当前线程的探测值和其他线程有冲突，就会进行伪随机调整（使用Marsaglia XORshift随机数算法？）
+     * nextSecondarySeed方法和 ThreadLocalRandom 经常在相同的场景下使用，但只有在瞬态应用场景比如：
+     * 为了更廉价供给RNG的随机自适应自旋/块序列 或者
+     * 一旦我们使用的话：原则上在主类ThreadLocalRandom中会扰乱用户可见性的统计属性
      *
-     * Note: Because of package-protection issues, versions of some
+     * 注释: 由于包保护问题，这个方法还会在子包中的类里有其他版本出现
+     * Because of package-protection issues, versions of some
      * these methods also appear in some subpackage classes.
      */
 
     /**
-     * Returns the probe value for the current thread without forcing
-     * initialization. Note that invoking ThreadLocalRandom.current()
-     * can be used to force initialization on zero return.
+     * 返回当前线程的探测值且不会强迫其初始化
+     * 注意可以通过调用ThreadLocalRandom.current()方法来强迫初始化并返回0
      */
     static final int getProbe() {
         return UNSAFE.getInt(Thread.currentThread(), PROBE);

@@ -428,8 +428,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     private transient volatile Node<K, V>[] nextTable;
 
     /**
-     * 基础计数器，大概没有线程竞争时使用
-     * 也是table 初始化时的一个回退依据，使用CAS方法更新
+     * ConcurrentHashMap中元素个数,但返回的不一定是当前Map的真实元素个数。基于CAS无锁更新
      */
     private transient volatile long baseCount;
 
@@ -537,18 +536,18 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                              float loadFactor, int concurrencyLevel) {
         if (!(loadFactor > 0.0f) || initialCapacity < 0 || concurrencyLevel <= 0)
             throw new IllegalArgumentException();
-        if (initialCapacity < concurrencyLevel)   // Use at least as many bins
-            initialCapacity = concurrencyLevel;   // as estimated threads
+        if (initialCapacity < concurrencyLevel)
+            initialCapacity = concurrencyLevel;
         long size = (long) (1.0 + (long) initialCapacity / loadFactor);
         int cap = (size >= (long) MAXIMUM_CAPACITY) ?
                 MAXIMUM_CAPACITY : tableSizeFor((int) size);
         this.sizeCtl = cap;
     }
 
-    // Original (since JDK1.2) Map methods
+    // 原始的 Map 方法(since JDK1.2)
 
     /**
-     * {@inheritDoc}
+     * 返回当前map大小
      */
     public int size() {
         long n = sumCount();
@@ -786,6 +785,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                 }
             }
         }
+        // 添加值成功，全局计数器加一
         addCount(1L, binCount);
         return null;
     }
@@ -1968,39 +1968,47 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Adds to count, and if table is too small and not already
-     * resizing, initiates transfer. If already resizing, helps
-     * perform transfer if work is available.  Rechecks occupancy
-     * after a transfer to see if another resize is already needed
-     * because resizings are lagging additions.
+     * 该方法主要做两件事，一件更新baseCount的值，第二件检测是否进行扩容
+     * 如果table太小而且还没准备好扩容，启动转换；如果已经准备好扩容了，协助转换
+     * 在转换后会再检查当前容积，以确认是否还需要再次扩容，因为扩容操作同时还会有数据操作
      *
-     * @param x     the count to add
-     * @param check if <0, don't check resize, if <= 1 only check if uncontended
+     * @param x      要增加的个数
+     * @param check 如果小于0，不需检查是否需要再次扩容，如果小于等于1 仅检查是否有竞争
      */
     private final void addCount(long x, int check) {
-        CounterCell[] as;
-        long b, s;
-        if ((as = counterCells) != null ||
-                !UNSAFE.compareAndSwapLong(this, BASE_COUNT, b = baseCount, s = b + x)) {
+
+        CounterCell[] as = counterCells;
+        long baseCount = this.baseCount;
+        long sumCount = baseCount + x;
+
+        // 在此处使用CAS方法进行计数
+        boolean isAddSuccess = UNSAFE.compareAndSwapLong(this, BASE_COUNT, baseCount, sumCount);
+
+        // 如果有竞争，或者计数未成功
+        if (as != null || !isAddSuccess) {
+
             CounterCell a;
-            long v;
-            int m;
+            long value;
+            int m = as.length - 1;
             boolean uncontended = true;
-            if (as == null || (m = as.length - 1) < 0 ||
+            int currentThreadProbeValue = ThreadLocalRandom.getProbe();
+
+
+            if (as == null || m < 0 ||
                     (a = as[ThreadLocalRandom.getProbe() & m]) == null ||
                     !(uncontended =
-                            UNSAFE.compareAndSwapLong(a, CELL_VALUE, v = a.value, v + x))) {
+                            UNSAFE.compareAndSwapLong(a, CELL_VALUE, value = a.value, value + x))) {
                 fullAddCount(x, uncontended);
                 return;
             }
             if (check <= 1)
                 return;
-            s = sumCount();
+            sumCount = sumCount();
         }
         if (check >= 0) {
             Node<K, V>[] tab, nt;
             int n, sc;
-            while (s >= (long) (sc = sizeCtl) && (tab = table) != null &&
+            while (sumCount >= (long) (sc = sizeCtl) && (tab = table) != null &&
                     (n = tab.length) < MAXIMUM_CAPACITY) {
                 int rs = resizeStamp(n);
                 if (sc < 0) {
@@ -2013,7 +2021,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                 } else if (UNSAFE.compareAndSwapInt(this, SIZE_CTL, sc,
                         (rs << RESIZE_STAMP_SHIFT) + 2))
                     transfer(tab, null);
-                s = sumCount();
+                sumCount = sumCount();
             }
         }
     }
@@ -2255,10 +2263,16 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         }
     }
 
+    /**
+     * 返回当前concurrentHashMap中的元素个数
+     */
     final long sumCount() {
+
         CounterCell[] as = counterCells;
         CounterCell a;
         long sum = baseCount;
+
+        // 遍历counterCells求和
         if (as != null) {
             for (int i = 0; i < as.length; ++i) {
                 if ((a = as[i]) != null)
