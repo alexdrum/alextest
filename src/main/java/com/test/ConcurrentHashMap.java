@@ -1977,7 +1977,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
      */
     private final void addCount(long x, int check) {
 
-        CounterCell[] as = counterCells;
+        CounterCell[] counterCellArray = counterCells;
         long baseCount = this.baseCount;
         long sumCount = baseCount + x;
 
@@ -1985,24 +1985,27 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
         boolean isAddSuccess = UNSAFE.compareAndSwapLong(this, BASE_COUNT, baseCount, sumCount);
 
         // 如果有竞争，或者计数未成功
-        if (as != null || !isAddSuccess) {
+        if (counterCellArray != null || !isAddSuccess) {
 
-            CounterCell a;
-            long value;
-            int m = as.length - 1;
-            boolean uncontended = true;
+            // 计算当前线程的counterCell在counterCellArray中的下标并将其取出，再对其进行计数
+            int counterCellArrayIndexes = counterCellArray.length - 1;
             int currentThreadProbeValue = ThreadLocalRandom.getProbe();
+            int currentThreadCounterCellIndex = currentThreadProbeValue & counterCellArrayIndexes;
+            CounterCell aCounterCell = counterCellArray[currentThreadCounterCellIndex];
+            long value = aCounterCell.value;
+            boolean isNotContend = UNSAFE.compareAndSwapLong(aCounterCell, CELL_VALUE, value, value + x);
 
-
-            if (as == null || m < 0 ||
-                    (a = as[ThreadLocalRandom.getProbe() & m]) == null ||
-                    !(uncontended =
-                            UNSAFE.compareAndSwapLong(a, CELL_VALUE, value = a.value, value + x))) {
-                fullAddCount(x, uncontended);
+            // 如果对counterCell计数不成功，则进行fullAddCount处理
+            if (counterCellArray == null || counterCellArrayIndexes < 0 || aCounterCell == null || !isNotContend) {
+                fullAddCount(x, isNotContend);
                 return;
             }
-            if (check <= 1)
+
+            // 如果不需要检查是否扩容，直接返回
+            if (check <= 1) {
                 return;
+            }
+
             sumCount = sumCount();
         }
         if (check >= 0) {
